@@ -74,28 +74,56 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(data),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
       const result = await response.json();
-      displayResponse(result.response);
+
+      if (result.message) {
+        displayMessage(result.message);
+      } else if (result.response) {
+        displayResponse(result.response);
+      } else {
+        throw new Error("Unexpected response format");
+      }
     } catch (error) {
       console.error("Error:", error);
-      alert("An error occurred. Please try again.");
+      displayMessage("An error occurred. Please try again.");
     } finally {
       // Hide loading indicator
       loadingIndicator.classList.add("hidden");
 
-      // Re-enable form elements
-      userId.disabled = false;
-      letterInput.disabled = false;
-      submitBtn.disabled = false;
-      submitBtn.style.backgroundColor = "";
+      // Re-enable form elements only if no message is displayed
+      if (!document.getElementById("messageDisplay")) {
+        userId.disabled = false;
+        letterInput.disabled = false;
+        submitBtn.disabled = false;
+        submitBtn.style.backgroundColor = "";
+      }
     }
   });
 
+  function displayMessage(message) {
+    // Remove any existing message
+    const existingMessage = document.getElementById("messageDisplay");
+    if (existingMessage) {
+      existingMessage.remove();
+    }
+
+    const messageElement = document.createElement("div");
+    messageElement.id = "messageDisplay";
+    messageElement.textContent = message;
+    messageElement.className = "message-display";
+
+    const container = document.querySelector(".container");
+    container.insertBefore(messageElement, container.firstChild);
+
+    // Disable form elements
+    userId.disabled = true;
+    letterInput.disabled = true;
+    submitBtn.disabled = true;
+    submitBtn.style.backgroundColor = "#6c757d";
+  }
+
   function displayResponse(response) {
+    console.log(response);
     const sections = response.split("%%%");
     if (sections.length !== 4) {
       console.error("Unexpected response format");
