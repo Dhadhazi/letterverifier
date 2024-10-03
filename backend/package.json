@@ -1,0 +1,14 @@
+{
+  "name": "letter-processing-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "nodemon app.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "openai": "^4.67.1"
+  }
+}

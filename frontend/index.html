@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Letter Processing Form</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Letter Processing Form</h1>
+      <div id="apiResponse" class="hidden">
+        <div id="professionalTone">
+          <h2>Professional Tone</h2>
+          <p></p>
+        </div>
+        <div id="clientNeedsSolution">
+          <h2>Client Needs and Solution</h2>
+          <p></p>
+        </div>
+        <div id="businessImpact">
+          <h2>Business Impact</h2>
+          <p></p>
+        </div>
+        <div id="updatedLetter">
+          <h2>Updated Letter</h2>
+          <div></div>
+        </div>
+      </div>
+      <form id="letterForm">
+        <div class="input-group">
+          <label for="userId">User ID:</label>
+          <input type="text" id="userId" required />
+        </div>
+        <div class="text-input">
+          <textarea
+            id="letterInput"
+            placeholder="Write your letter here..."
+            required
+          ></textarea>
+          <div id="wordCount">Words: 0</div>
+          <div id="wordWarning"></div>
+        </div>
+        <button type="submit" id="submitBtn" disabled>Submit</button>
+      </form>
+      <div id="loadingIndicator" class="hidden">
+        <div class="loader"></div>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
