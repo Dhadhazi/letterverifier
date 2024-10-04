@@ -1,11 +1,28 @@
-/* Font faces and other KaTeX-specific styles can be added here if needed */
+:root {
+  --primary-color: #28a745;
+  --primary-hover-color: #218838;
+  --disabled-color: #6c757d;
+  --background-color: #f4f4f4;
+  --text-color: #333;
+  --border-color: #ccc;
+  --error-background: #f8d7da;
+  --error-text: #721c24;
+  --error-border: #f5c6cb;
+  --light-background: #f8f9fa;
+  --light-border: #dee2e6;
+  --font-size-base: 1em;
+  --font-size-small: 0.9rem;
+  --font-size-large: 1.2rem;
+  --font-size-title: 2em;
+}
 
 body {
   font-family: Arial, sans-serif;
   line-height: 1.6;
   margin: 0;
   padding: 0;
-  background-color: #f4f4f4;
+  background-color: var(--background-color);
+  color: var(--text-color);
   counter-reset: katexEqnNo mmlEqnNo;
 }
 
@@ -21,8 +38,8 @@ body {
 
 h1 {
   text-align: center;
-  color: #333;
-  font-size: 2em;
+  color: var(--text-color);
+  font-size: var(--font-size-title);
   margin-bottom: 1rem;
 }
 
@@ -41,10 +58,10 @@ input[type="text"],
 textarea {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 3px;
   font-family: inherit;
-  font-size: 1em;
+  font-size: var(--font-size-base);
 }
 
 .text-input {
@@ -61,7 +78,7 @@ textarea {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  font-size: 0.9rem;
+  font-size: var(--font-size-small);
   background-color: rgba(255, 255, 255, 0.8);
   padding: 0.2rem 0.5rem;
   border-radius: 3px;
@@ -69,29 +86,29 @@ textarea {
 
 #wordWarning {
   margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #dc3545;
+  font-size: var(--font-size-small);
+  color: var(--error-text);
 }
 
 #submitBtn {
   display: block;
   width: 100%;
   padding: 0.75rem;
-  background-color: #28a745;
+  background-color: var(--primary-color);
   color: #fff;
   border: none;
   border-radius: 3px;
   cursor: pointer;
   transition: background-color 0.3s;
-  font-size: 1em;
+  font-size: var(--font-size-base);
 }
 
 #submitBtn:hover:not(:disabled) {
-  background-color: #218838;
+  background-color: var(--primary-hover-color);
 }
 
 #submitBtn:disabled {
-  background-color: #6c757d;
+  background-color: var(--disabled-color);
   cursor: not-allowed;
 }
 
@@ -115,15 +132,15 @@ textarea {
 #apiResponse > div {
   margin-bottom: 2rem;
   padding: 1rem;
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background-color: var(--light-background);
+  border: 1px solid var(--light-border);
   border-radius: 3px;
 }
 
 #apiResponse h2 {
   margin-top: 0;
-  color: #333;
-  font-size: 1.2rem;
+  color: var(--text-color);
+  font-size: var(--font-size-large);
 }
 
 #updatedLetter div {
@@ -155,11 +172,11 @@ textarea {
 }
 
 .message-display {
-  background-color: #f8d7da;
-  color: #721c24;
+  background-color: var(--error-background);
+  color: var(--error-text);
   padding: 1rem;
   margin-bottom: 1rem;
-  border: 1px solid #f5c6cb;
+  border: 1px solid var(--error-border);
   border-radius: 5px;
   font-weight: bold;
   text-align: center;
@@ -167,8 +184,8 @@ textarea {
 
 #remainingRequests {
   text-align: center;
-  font-size: 0.9rem;
-  color: #6c757d;
+  font-size: var(--font-size-small);
+  color: var(--disabled-color);
   margin-top: 1rem;
 }
 
@@ -186,5 +203,39 @@ textarea {
 
   label {
     margin-bottom: 0.5rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    font-size: 12pt;
+    line-height: 1.5;
+    background-color: #fff;
+  }
+
+  .container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  #submitBtn,
+  #loadingIndicator,
+  #wordCount,
+  #wordWarning {
+    display: none;
+  }
+
+  textarea {
+    border: none;
+  }
+
+  #apiResponse > div {
+    page-break-inside: avoid;
+    border: none;
+    background-color: #fff;
   }
 }

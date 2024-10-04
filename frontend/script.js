@@ -1,118 +1,175 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("letterForm");
-  const userId = document.getElementById("userId");
-  const letterInput = document.getElementById("letterInput");
-  const wordCount = document.getElementById("wordCount");
-  const wordWarning = document.getElementById("wordWarning");
-  const submitBtn = document.getElementById("submitBtn");
-  const loadingIndicator = document.getElementById("loadingIndicator");
-  const apiResponse = document.getElementById("apiResponse");
-  const remainingRequests = document.getElementById("remainingRequests");
+const BACKEND_URL = "http://localhost:3000";
+// const BACKEND_URL = "http://51.20.183.119";
 
-  // Word count and warnings
-  letterInput.addEventListener("input", () => {
-    const words = letterInput.value
+document.addEventListener("DOMContentLoaded", () => {
+  const elements = {
+    form: document.getElementById("letterForm"),
+    userId: document.getElementById("userId"),
+    apiKey: document.getElementById("apiKey"),
+    letterInput: document.getElementById("letterInput"),
+    wordCount: document.getElementById("wordCount"),
+    wordWarning: document.getElementById("wordWarning"),
+    submitBtn: document.getElementById("submitBtn"),
+    loadingIndicator: document.getElementById("loadingIndicator"),
+    apiResponse: document.getElementById("apiResponse"),
+    remainingRequests: document.getElementById("remainingRequests"),
+  };
+
+  const DEBOUNCE_DELAY = 300;
+
+  const WORD_LIMITS = {
+    MIN: 100,
+    MAX: 300,
+    ABSOLUTE_MAX: 350,
+  };
+
+  initializeForm();
+  setupEventListeners();
+
+  function debounce(func, delay) {
+    let timeoutId;
+    return function (...args) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+  }
+
+  function initializeForm() {
+    elements.userId.value = localStorage.getItem("userId") || "";
+    elements.apiKey.value = localStorage.getItem("apiKey") || "";
+  }
+
+  function setupEventListeners() {
+    elements.letterInput.addEventListener(
+      "input",
+      debounce(handleWordCount, DEBOUNCE_DELAY)
+    );
+    elements.form.addEventListener("submit", handleSubmit);
+  }
+
+  function handleWordCount() {
+    const words = getWords(elements.letterInput.value);
+    const wordCountValue = words.length;
+    elements.wordCount.textContent = `Words: ${wordCountValue}`;
+
+    updateWordWarning(wordCountValue);
+    updateSubmitButton(wordCountValue);
+  }
+
+  function getWords(text) {
+    return text
       .trim()
       .split(/\s+/)
       .filter((word) => word.length > 0);
-    const wordCountValue = words.length;
-    wordCount.textContent = `Words: ${wordCountValue}`;
+  }
 
-    if (wordCountValue < 100) {
-      wordWarning.textContent = `You need to write ${
-        100 - wordCountValue
+  function updateWordWarning(wordCount) {
+    if (wordCount < WORD_LIMITS.MIN) {
+      elements.wordWarning.textContent = `You need to write ${
+        WORD_LIMITS.MIN - wordCount
       } more words for the minimum length of the letter`;
-      submitBtn.disabled = true;
-    } else if (wordCountValue > 300 && wordCountValue <= 350) {
-      wordWarning.textContent =
+    } else if (
+      wordCount > WORD_LIMITS.MAX &&
+      wordCount <= WORD_LIMITS.ABSOLUTE_MAX
+    ) {
+      elements.wordWarning.textContent =
         "Your letter is over 300 words, make it a bit more concise!";
-      submitBtn.disabled = false;
-    } else if (wordCountValue > 350) {
-      wordWarning.textContent =
+    } else if (wordCount > WORD_LIMITS.ABSOLUTE_MAX) {
+      elements.wordWarning.textContent =
         "Your letter is too long, it should be under 350 words!";
-      letterInput.value = words.slice(0, 350).join(" ");
-      submitBtn.disabled = false;
+      truncateText();
     } else {
-      wordWarning.textContent = "";
-      submitBtn.disabled = false;
+      elements.wordWarning.textContent = "";
     }
-  });
+  }
 
-  // Form submission
-  form.addEventListener("submit", async (e) => {
+  function updateSubmitButton(wordCount) {
+    elements.submitBtn.disabled =
+      wordCount < WORD_LIMITS.MIN || wordCount > WORD_LIMITS.ABSOLUTE_MAX;
+  }
+
+  function truncateText() {
+    const words = getWords(elements.letterInput.value);
+    elements.letterInput.value = words
+      .slice(0, WORD_LIMITS.ABSOLUTE_MAX)
+      .join(" ");
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
 
-    const words = letterInput.value
-      .trim()
-      .split(/\s+/)
-      .filter((word) => word.length > 0);
-    if (words.length < 100 || words.length > 350) {
-      alert("Your letter should be between 100 and 350 words");
+    const words = getWords(elements.letterInput.value);
+    if (
+      words.length < WORD_LIMITS.MIN ||
+      words.length > WORD_LIMITS.ABSOLUTE_MAX
+    ) {
+      alert(
+        `Your letter should be between ${WORD_LIMITS.MIN} and ${WORD_LIMITS.ABSOLUTE_MAX} words`
+      );
       return;
     }
 
-    // Disable form elements
-    userId.disabled = true;
-    letterInput.disabled = true;
-    submitBtn.disabled = true;
-    submitBtn.style.backgroundColor = "#6c757d";
-
-    // Show loading indicator
-    loadingIndicator.classList.remove("hidden");
-    apiResponse.classList.add("hidden");
-
-    const data = {
-      userId: userId.value,
-      text: letterInput.value,
-      apiKey: "3b53cb7a-cf27-4fd3-80c3-6ec7dd5c8275",
-    };
+    saveUserData();
+    setFormState(true);
 
     try {
-      const response = await fetch("http://localhost:3000/process-letter", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (result.message) {
-        displayMessage(result.message);
-      } else if (result.response) {
-        displayResponse(result.response);
-      } else {
-        throw new Error("Unexpected response format");
-      }
-
-      if (result.requests !== undefined) {
-        remainingRequests.textContent = `${result.requests} requests left for today.`;
-        remainingRequests.classList.remove("hidden");
-      }
+      const result = await sendRequest();
+      handleResponse(result);
     } catch (error) {
       console.error("Error:", error);
       displayMessage("An error occurred. Please try again.");
     } finally {
-      // Hide loading indicator
-      loadingIndicator.classList.add("hidden");
-
-      // Re-enable form elements only if no message is displayed
-      if (!document.getElementById("messageDisplay")) {
-        userId.disabled = false;
-        letterInput.disabled = false;
-        submitBtn.disabled = false;
-        submitBtn.style.backgroundColor = "";
-      }
+      elements.loadingIndicator.classList.add("hidden");
+      setFormState(false);
     }
-  });
+  }
+
+  function saveUserData() {
+    localStorage.setItem("userId", elements.userId.value);
+    localStorage.setItem("apiKey", elements.apiKey.value);
+  }
+
+  function setFormState(disabled) {
+    elements.userId.disabled = disabled;
+    elements.apiKey.disabled = disabled;
+    elements.letterInput.disabled = disabled;
+    elements.submitBtn.disabled = disabled;
+    elements.submitBtn.style.backgroundColor = disabled ? "#6c757d" : "";
+    elements.loadingIndicator.classList.toggle("hidden", !disabled);
+    elements.apiResponse.classList.toggle("hidden", disabled);
+  }
+
+  async function sendRequest() {
+    const response = await fetch(`${BACKEND_URL}/api/process-letter`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: elements.userId.value,
+        text: elements.letterInput.value,
+        apiKey: elements.apiKey.value,
+      }),
+    });
+    return response.json();
+  }
+
+  function handleResponse(result) {
+    if (result.message) {
+      displayMessage(result.message);
+    } else if (result.response) {
+      displayResponse(result.response);
+    } else {
+      throw new Error("Unexpected response format");
+    }
+
+    if (result.requests !== undefined) {
+      elements.remainingRequests.textContent = `${result.requests} requests left for today.`;
+      elements.remainingRequests.classList.remove("hidden");
+    }
+  }
 
   function displayMessage(message) {
-    // Remove any existing message
     const existingMessage = document.getElementById("messageDisplay");
-    if (existingMessage) {
-      existingMessage.remove();
-    }
+    if (existingMessage) existingMessage.remove();
 
     const messageElement = document.createElement("div");
     messageElement.id = "messageDisplay";
@@ -122,15 +179,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const container = document.querySelector(".container");
     container.insertBefore(messageElement, container.firstChild);
 
-    // Disable form elements
-    userId.disabled = true;
-    letterInput.disabled = true;
-    submitBtn.disabled = true;
-    submitBtn.style.backgroundColor = "#6c757d";
+    setFormState(true);
   }
 
   function displayResponse(response) {
-    console.log(response);
     const sections = response.split("%%%");
     if (sections.length !== 4) {
       console.error("Unexpected response format");
@@ -145,6 +197,6 @@ document.addEventListener("DOMContentLoaded", () => {
       sections[2].trim();
     document.querySelector("#updatedLetter div").innerHTML = sections[3].trim();
 
-    apiResponse.classList.remove("hidden");
+    elements.apiResponse.classList.remove("hidden");
   }
 });

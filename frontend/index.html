@@ -3,51 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Letter Processing Form for improving expression of interest letters"
+    />
     <title>Letter Processing Form</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <div class="container">
-      <h1>Letter Processing Form</h1>
-      <div id="apiResponse" class="hidden">
-        <div id="professionalTone">
-          <h2>Professional Tone</h2>
-          <p></p>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Letter Processing Form</title>
+      <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+      <div class="container">
+        <h1>Letter Processing Form</h1>
+        <div id="apiResponse" class="hidden">
+          <div id="professionalTone">
+            <h2>Professional Tone</h2>
+            <p></p>
+          </div>
+          <div id="clientNeedsSolution">
+            <h2>Client Needs and Solution</h2>
+            <p></p>
+          </div>
+          <div id="businessImpact">
+            <h2>Business Impact</h2>
+            <p></p>
+          </div>
+          <div id="updatedLetter">
+            <h2>Updated Letter</h2>
+            <div></div>
+          </div>
         </div>
-        <div id="clientNeedsSolution">
-          <h2>Client Needs and Solution</h2>
-          <p></p>
-        </div>
-        <div id="businessImpact">
-          <h2>Business Impact</h2>
-          <p></p>
-        </div>
-        <div id="updatedLetter">
-          <h2>Updated Letter</h2>
-          <div></div>
+        <form id="letterForm">
+          <div class="input-group">
+            <label for="userId">User ID:</label>
+            <input type="text" id="userId" value="Tester" required />
+          </div>
+          <div class="input-group">
+            <label for="apiKey">API Key:</label>
+            <input type="text" id="apiKey" required />
+          </div>
+          <div class="text-input">
+            <textarea
+              id="letterInput"
+              placeholder="Write your letter here..."
+              required
+            ></textarea>
+            <div id="wordCount">Word count: 0</div>
+            <div id="wordWarning"></div>
+          </div>
+          <div id="remainingRequests"></div>
+          <button type="submit" id="submitBtn" disabled>Submit</button>
+        </form>
+        <div id="loadingIndicator" class="hidden">
+          <div class="loader"></div>
         </div>
       </div>
-      <form id="letterForm">
-        <div class="input-group">
-          <label for="userId">User ID:</label>
-          <input type="text" id="userId" value="Tester" required />
-        </div>
-        <div class="text-input">
-          <textarea
-            id="letterInput"
-            placeholder="Write your letter here..."
-            required
-          ></textarea>
-          <div id="wordCount">Word count: 0</div>
-          <div id="wordWarning"></div>
-        </div>
-        <div id="remainingRequests"></div>
-        <button type="submit" id="submitBtn" disabled>Submit</button>
-      </form>
-      <div id="loadingIndicator" class="hidden">
-        <div class="loader"></div>
-      </div>
-    </div>
-    <script src="script.js"></script>
-  </body>
+      <script src="script.js"></script>
+    </body>
+  </html>
 </html>
