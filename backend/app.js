@@ -7,7 +7,11 @@ import path from "path";
 
 dotenv.config();
 
-const DAILY_LIMIT = 10;
+const API_KEY = "3b53cb7a-cf27-4fd3-80c3-6ec7dd5c8275";
+const DAILY_LIMIT = 5;
+const LIMIT_REACHED_MESSAGE =
+  "Wow! You've sent us lots of letters to check today, great job! You can send more letters tomorrow when your daily limit starts over. We're looking forward to helping you again then!";
+
 const SYSTEM_MESSAGE = `You are a teacher helping freelancers improve their expression of interest (EoI) letters. Provide concise feedback for each specified section and an updated letter. Use simple language. Explain issues briefly. Include one encouraging note per section. Do not use formatting. Do not repeat section names. Sections:
 Professional tone
 Client needs and proposed solution
@@ -27,7 +31,11 @@ app.use(express.json());
 
 app.post("/process-letter", async (req, res) => {
   try {
-    const { userId, text } = req.body;
+    const { userId, text, apiKey } = req.body;
+
+    if (apiKey !== API_KEY) {
+      return res.status(500).json({ error: "Invalid API key" });
+    }
 
     if (!userId || !text) {
       return res.status(400).json({ error: "Missing userId or text" });
@@ -41,15 +49,16 @@ app.post("/process-letter", async (req, res) => {
       .padStart(2, "0")}-${today.getFullYear()}`;
     const logDir = path.join("logs", userId, dateString);
 
-    // Create directories if they don't exist
     fs.mkdirSync(logDir, { recursive: true });
 
-    // Get the number of files in the directory
     const files = fs.readdirSync(logDir);
+    const remainingRequests = DAILY_LIMIT - files.length;
 
-    // Check if the user has reached the daily limit
     if (files.length >= DAILY_LIMIT) {
-      return res.status(200).json({ message: "You reached your daily limit" });
+      return res.status(200).json({
+        message: LIMIT_REACHED_MESSAGE,
+        requests: remainingRequests,
+      });
     }
 
     const cleanText = text.replace(/[^a-zA-Z0-9\s.,!?]/g, "");
@@ -83,7 +92,10 @@ app.post("/process-letter", async (req, res) => {
       }
     });
 
-    res.json({ response: aiResponse });
+    res.json({
+      response: aiResponse,
+      requests: remainingRequests - 1,
+    });
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ error: error.message });

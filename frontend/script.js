@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitBtn = document.getElementById("submitBtn");
   const loadingIndicator = document.getElementById("loadingIndicator");
   const apiResponse = document.getElementById("apiResponse");
+  const remainingRequests = document.getElementById("remainingRequests");
 
   // Word count and warnings
   letterInput.addEventListener("input", () => {
@@ -63,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const data = {
       userId: userId.value,
       text: letterInput.value,
+      apiKey: "3b53cb7a-cf27-4fd3-80c3-6ec7dd5c8275",
     };
 
     try {
@@ -82,6 +84,11 @@ document.addEventListener("DOMContentLoaded", () => {
         displayResponse(result.response);
       } else {
         throw new Error("Unexpected response format");
+      }
+
+      if (result.requests !== undefined) {
+        remainingRequests.textContent = `${result.requests} requests left for today.`;
+        remainingRequests.classList.remove("hidden");
       }
     } catch (error) {
       console.error("Error:", error);
