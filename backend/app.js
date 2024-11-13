@@ -2,8 +2,12 @@ import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import cors from "cors";
-import fs from "fs/promises";
-import path from "path";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 dotenv.config();
 
@@ -13,7 +17,10 @@ const {
   OPENAI_API_KEY,
   GPT_MODEL = "gpt-4o-mini",
   DAILY_LIMIT = 5,
+  AWS_REGION = "eu-north-1",
 } = process.env;
+
+const TABLE_NAME = "letter_verifier";
 
 const LIMIT_REACHED_MESSAGE =
   "Wow! You've sent us lots of letters to check today, great job! You can send more letters tomorrow when your daily limit starts over. We're looking forward to helping you again then!";
@@ -34,10 +41,13 @@ Output your response in the following JSON format:
   },
   "updated_letter": "Your updated letter here."
 }
-In the updated letter, bold any changes made compared to the original letter by wrapping them with HTML <strong> tags.`;
+Mark changes in the new letter using <strong> tags around modified text.`;
 
 const app = express();
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+const client = new DynamoDBClient({ region: AWS_REGION });
+const dynamo = DynamoDBDocumentClient.from(client);
 
 app.use(cors());
 app.use(express.json());
@@ -51,25 +61,68 @@ const validateRequest = (userId, text, apiKey) => {
   }
 };
 
-const getLogDirectory = (userId) => {
-  const today = new Date();
-  const dateString = today.toISOString().split("T")[0].replace(/-/g, "");
-  return path.join("logs", userId, dateString);
+const getCurrentDateKey = () => {
+  return new Date().toISOString().split("T")[0];
 };
 
-const checkDailyLimit = async (logDir) => {
-  await fs.mkdir(logDir, { recursive: true });
-  const files = await fs.readdir(logDir);
-  const remainingRequests = DAILY_LIMIT - files.length;
+const checkDailyLimit = async (userId) => {
+  const dateKey = getCurrentDateKey();
 
-  if (files.length >= DAILY_LIMIT) {
-    throw new Error(LIMIT_REACHED_MESSAGE);
+  const params = {
+    TableName: TABLE_NAME,
+    Key: {
+      userId: userId,
+      date: dateKey,
+    },
+    ProjectionExpression: "messageCount",
+  };
+
+  const result = await dynamo.send(new GetCommand(params));
+  return result.Item?.messageCount || 0;
+};
+
+const updateUserRecord = async (userId, text, aiResponse) => {
+  const dateKey = getCurrentDateKey();
+  const timestamp = new Date().toISOString();
+
+  const params = {
+    TableName: TABLE_NAME,
+    Key: {
+      userId: userId,
+      date: dateKey,
+    },
+    UpdateExpression: `
+      SET messageCount = if_not_exists(messageCount, :zero) + :inc,
+      messages = list_append(if_not_exists(messages, :empty_list), :new_message)
+    `,
+    ExpressionAttributeValues: {
+      ":zero": 0,
+      ":inc": 1,
+      ":empty_list": [],
+      ":new_message": [
+        {
+          timestamp,
+          userText: text,
+          aiResponse,
+        },
+      ],
+      ":limit": DAILY_LIMIT,
+    },
+    ConditionExpression:
+      "attribute_not_exists(messageCount) OR messageCount < :limit",
+    ReturnValues: "UPDATED_NEW",
+  };
+
+  try {
+    const result = await dynamo.send(new UpdateCommand(params));
+    return result.Attributes.messageCount;
+  } catch (error) {
+    if (error.name === "ConditionalCheckFailedException") {
+      throw new Error(LIMIT_REACHED_MESSAGE);
+    }
+    throw error;
   }
-
-  return remainingRequests;
 };
-
-const cleanText = (text) => text.replace(/[^a-zA-Z0-9\s.,!?]/g, "");
 
 const getAIResponse = async (text) => {
   const response = await openai.chat.completions.create({
@@ -82,33 +135,27 @@ const getAIResponse = async (text) => {
   return response.choices[0].message.content;
 };
 
-const logRequest = async (logDir, userId, text, aiResponse) => {
-  const files = await fs.readdir(logDir);
-  const fileNumber = files.length + 1;
-  const logData = {
-    userId,
-    userText: text,
-    openAiText: aiResponse,
-    timestamp: new Date().toISOString(),
-  };
-  const logFilePath = path.join(logDir, `${fileNumber}.json`);
-  await fs.writeFile(logFilePath, JSON.stringify(logData, null, 2));
-};
-
 app.post("/api/process-letter", async (req, res) => {
   try {
     const { userId, text, apiKey } = req.body;
     validateRequest(userId, text, apiKey);
 
-    const logDir = getLogDirectory(userId);
-    const remainingRequests = await checkDailyLimit(logDir);
-    const cleanedText = cleanText(text);
+    const currentCount = await checkDailyLimit(userId);
+
+    if (currentCount >= DAILY_LIMIT) {
+      return res.status(400).json({
+        error: LIMIT_REACHED_MESSAGE,
+        requests: 0,
+      });
+    }
+
+    const cleanedText = text.replace(/[^a-zA-Z0-9\s.,!?]/g, "");
     const aiResponse = await getAIResponse(cleanedText);
-    await logRequest(logDir, userId, text, aiResponse);
+    const newCount = await updateUserRecord(userId, text, aiResponse);
 
     res.json({
       response: aiResponse,
-      requests: remainingRequests - 1,
+      requests: DAILY_LIMIT - newCount,
     });
   } catch (error) {
     console.error("Error:", error);

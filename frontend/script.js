@@ -162,9 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (result.response) {
       try {
-        console.log("got response!", result.response);
         const parsedResponse = JSON.parse(result.response);
-        console.log("parsed response!", parsedResponse);
         displayJsonResponse(parsedResponse);
       } catch (error) {
         console.error("Error parsing JSON response:", error);
