@@ -1,7 +1,4 @@
-import express from "express";
 import OpenAI from "openai";
-import dotenv from "dotenv";
-import cors from "cors";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
@@ -9,19 +6,15 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
-dotenv.config();
-
 const {
-  PORT = 3000,
-  API_KEY = "3b53cb7a-cf27-4fd3-80c3-6ec7dd5c8275",
+  API_KEY,
   OPENAI_API_KEY,
   GPT_MODEL = "gpt-4o-mini",
   DAILY_LIMIT = 5,
-  AWS_REGION,
 } = process.env;
 
 const TABLE_NAME = "letter_verifier";
-
+const TIMEOUT_MESSAGE = "The server is busy. Please try again later.";
 const LIMIT_REACHED_MESSAGE =
   "Wow! You've sent us lots of letters to check today, great job! You can send more letters tomorrow when your daily limit starts over. We're looking forward to helping you again then!";
 
@@ -43,14 +36,9 @@ Output your response in the following JSON format:
 }
 Mark changes in the new letter using <strong> tags around modified text.`;
 
-const app = express();
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-
-const client = new DynamoDBClient({ region: AWS_REGION });
+const client = new DynamoDBClient({});
 const dynamo = DynamoDBDocumentClient.from(client);
-
-app.use(cors());
-app.use(express.json());
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 const validateRequest = (userId, text, apiKey) => {
   if (apiKey !== API_KEY) {
@@ -67,7 +55,6 @@ const getCurrentDateKey = () => {
 
 const checkDailyLimit = async (userId) => {
   const dateKey = getCurrentDateKey();
-
   const params = {
     TableName: TABLE_NAME,
     Key: {
@@ -93,7 +80,7 @@ const updateUserRecord = async (userId, text, aiResponse) => {
     },
     UpdateExpression: `
       SET messageCount = if_not_exists(messageCount, :zero) + :inc,
-      messages = list_append(if_not_exists(messages, :empty_list), :new_message)
+          messages = list_append(if_not_exists(messages, :empty_list), :new_message)
     `,
     ExpressionAttributeValues: {
       ":zero": 0,
@@ -106,66 +93,107 @@ const updateUserRecord = async (userId, text, aiResponse) => {
           aiResponse,
         },
       ],
-      ":limit": DAILY_LIMIT,
     },
-    ConditionExpression:
-      "attribute_not_exists(messageCount) OR messageCount < :limit",
     ReturnValues: "UPDATED_NEW",
   };
 
   try {
+    console.log(
+      "Updating DynamoDB with params:",
+      JSON.stringify(params, null, 2)
+    );
     const result = await dynamo.send(new UpdateCommand(params));
     return result.Attributes.messageCount;
   } catch (error) {
-    if (error.name === "ConditionalCheckFailedException") {
-      throw new Error(LIMIT_REACHED_MESSAGE);
-    }
+    console.error("Error updating user record:", error);
     throw error;
   }
 };
 
 const getAIResponse = async (text) => {
-  const response = await openai.chat.completions.create({
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(TIMEOUT_MESSAGE)), 15000)
+  );
+
+  const aiPromise = openai.chat.completions.create({
     model: GPT_MODEL,
     messages: [
       { role: "system", content: SYSTEM_MESSAGE },
       { role: "user", content: text },
     ],
+    temperature: 0.7,
+    max_tokens: 1000,
   });
-  return response.choices[0].message.content;
+
+  try {
+    const response = await Promise.race([aiPromise, timeoutPromise]);
+    if (!response || !response.choices || !response.choices[0]) {
+      console.error("Unexpected OpenAI response structure:", response);
+      throw new Error("Invalid response from OpenAI");
+    }
+    return response.choices[0].message.content;
+  } catch (error) {
+    console.error("OpenAI API Error:", error);
+    if (error.message === TIMEOUT_MESSAGE) {
+      throw error;
+    }
+    if (error.response) {
+      console.error("OpenAI Error Response:", error.response.data);
+    }
+    throw new Error(error.message || "Error getting AI response");
+  }
 };
 
-app.post("/api/process-letter", async (req, res) => {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+  "Access-Control-Allow-Methods": "OPTIONS,POST",
+  "Content-Type": "application/json",
+};
+
+export const handler = async (event) => {
+  const response = {
+    headers: corsHeaders,
+  };
+
   try {
-    const { userId, text, apiKey } = req.body;
+    const body = JSON.parse(event.body);
+    const { userId, text, apiKey } = body;
+
     validateRequest(userId, text, apiKey);
 
     const currentCount = await checkDailyLimit(userId);
 
-    if (currentCount >= DAILY_LIMIT) {
-      return res.status(400).json({
-        error: LIMIT_REACHED_MESSAGE,
-        requests: 0,
-      });
+    if (currentCount >= parseInt(DAILY_LIMIT)) {
+      return {
+        ...response,
+        statusCode: 400,
+        body: JSON.stringify({
+          error: LIMIT_REACHED_MESSAGE,
+          requests: 0,
+        }),
+      };
     }
 
     const cleanedText = text.replace(/[^a-zA-Z0-9\s.,!?]/g, "");
     const aiResponse = await getAIResponse(cleanedText);
-
     const newCount = await updateUserRecord(userId, text, aiResponse);
 
-    res.json({
-      response: aiResponse,
-      requests: DAILY_LIMIT - newCount,
-    });
+    return {
+      ...response,
+      statusCode: 200,
+      body: JSON.stringify({
+        response: aiResponse,
+        requests: parseInt(DAILY_LIMIT) - newCount,
+      }),
+    };
   } catch (error) {
     console.error("Error:", error);
-    res
-      .status(error.message === "Invalid API key" ? 500 : 400)
-      .json({ error: error.message });
+    return {
+      ...response,
+      statusCode: error.message === "Invalid API key" ? 500 : 400,
+      body: JSON.stringify({ error: error.message }),
+    };
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+};

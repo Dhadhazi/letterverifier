@@ -1,5 +1,6 @@
-const BACKEND_URL = "http://localhost:3000";
-// const BACKEND_URL = "http://51.20.183.119";
+// const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL =
+  "https://mh6papii0e.execute-api.eu-north-1.amazonaws.com/test";
 
 document.addEventListener("DOMContentLoaded", () => {
   const elements = {
@@ -142,16 +143,29 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendRequest() {
-    const response = await fetch(`${BACKEND_URL}/api/process-letter`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: elements.userId.value,
-        text: elements.letterInput.value,
-        apiKey: elements.apiKey.value,
-      }),
-    });
-    return response.json();
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/process-letter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: elements.userId.value,
+          text: elements.letterInput.value,
+          apiKey: elements.apiKey.value,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Request failed");
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error("Request error:", error);
+      throw error;
+    }
   }
 
   function handleResponse(result) {
