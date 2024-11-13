@@ -18,11 +18,23 @@ const {
 const LIMIT_REACHED_MESSAGE =
   "Wow! You've sent us lots of letters to check today, great job! You can send more letters tomorrow when your daily limit starts over. We're looking forward to helping you again then!";
 
-const SYSTEM_MESSAGE = `You are a teacher helping freelancers improve their expression of interest (EoI) letters. Provide concise feedback for each specified section and an updated letter. Use simple language. Explain issues briefly. Include one encouraging note per section. Do not use formatting. Do not repeat section names. Sections:
-Professional tone
-Client needs and proposed solution
-Understanding of the business impact
-After feedback, provide the updated letter without any introductory text. Adhere to requirements. Do not hallucinate or add content not present in the original letter. You can add notes to the letter if something is unclear but should be in it, but put it in <>. Maximum 300 words for the EoI. Put %%% after each section. Separate each section and the letter with %%%. Use HTML formatting in your response.`;
+const SYSTEM_MESSAGE = `You are a teacher helping freelancers enhance their Expression of Interest (EoI) letters. For each of the following sections, provide concise feedback using simple language. Briefly explain any issues and include one encouraging note per section. Do not repeat the section names. The sections are:
+
+Professional Tone
+Client Needs and Proposed Solution
+Understanding of the Business Impact
+After providing feedback, present the updated EoI letter without any introductory text. If certain necessary information is unclear or missing, indicate this within angle brackets <> in the letter. The EoI should be a maximum of 300 words.
+
+Output your response in the following JSON format:
+{
+  "feedback": {
+    "professional_tone": "Your feedback here.",
+    "client_needs_and_proposed_solution": "Your feedback here.",
+    "understanding_of_business_impact": "Your feedback here."
+  },
+  "updated_letter": "Your updated letter here."
+}
+In the updated letter, bold any changes made compared to the original letter by wrapping them with HTML <strong> tags.`;
 
 const app = express();
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -90,10 +102,8 @@ app.post("/api/process-letter", async (req, res) => {
 
     const logDir = getLogDirectory(userId);
     const remainingRequests = await checkDailyLimit(logDir);
-
     const cleanedText = cleanText(text);
     const aiResponse = await getAIResponse(cleanedText);
-
     await logRequest(logDir, userId, text, aiResponse);
 
     res.json({

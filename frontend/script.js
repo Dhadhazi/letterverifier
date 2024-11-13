@@ -136,7 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
     elements.submitBtn.disabled = disabled;
     elements.submitBtn.style.backgroundColor = disabled ? "#6c757d" : "";
     elements.loadingIndicator.classList.toggle("hidden", !disabled);
-    elements.apiResponse.classList.toggle("hidden", disabled);
+    if (!disabled) {
+      elements.apiResponse.classList.remove("hidden");
+    }
   }
 
   async function sendRequest() {
@@ -153,18 +155,41 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function handleResponse(result) {
-    if (result.message) {
-      displayMessage(result.message);
-    } else if (result.response) {
-      displayResponse(result.response);
-    } else {
-      throw new Error("Unexpected response format");
+    if (result.error) {
+      displayMessage(result.error);
+      return;
+    }
+
+    if (result.response) {
+      try {
+        console.log("got response!", result.response);
+        const parsedResponse = JSON.parse(result.response);
+        console.log("parsed response!", parsedResponse);
+        displayJsonResponse(parsedResponse);
+      } catch (error) {
+        console.error("Error parsing JSON response:", error);
+        displayMessage("Error processing the response");
+      }
     }
 
     if (result.requests !== undefined) {
       elements.remainingRequests.textContent = `${result.requests} requests left for today.`;
       elements.remainingRequests.classList.remove("hidden");
     }
+  }
+
+  function displayJsonResponse(response) {
+    document.querySelector("#professionalTone p").textContent =
+      response.feedback.professional_tone;
+    document.querySelector("#clientNeedsSolution p").textContent =
+      response.feedback.client_needs_and_proposed_solution;
+    document.querySelector("#businessImpact p").textContent =
+      response.feedback.understanding_of_business_impact;
+
+    document.querySelector("#updatedLetter div").innerHTML =
+      response.updated_letter;
+
+    elements.apiResponse.classList.remove("hidden");
   }
 
   function displayMessage(message) {
@@ -178,25 +203,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const container = document.querySelector(".container");
     container.insertBefore(messageElement, container.firstChild);
-
-    setFormState(true);
-  }
-
-  function displayResponse(response) {
-    const sections = response.split("%%%");
-    if (sections.length !== 4) {
-      console.error("Unexpected response format");
-      return;
-    }
-
-    document.querySelector("#professionalTone p").textContent =
-      sections[0].trim();
-    document.querySelector("#clientNeedsSolution p").textContent =
-      sections[1].trim();
-    document.querySelector("#businessImpact p").textContent =
-      sections[2].trim();
-    document.querySelector("#updatedLetter div").innerHTML = sections[3].trim();
-
-    elements.apiResponse.classList.remove("hidden");
   }
 });
