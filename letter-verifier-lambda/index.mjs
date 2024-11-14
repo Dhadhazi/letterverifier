@@ -11,6 +11,7 @@ const {
   OPENAI_API_KEY,
   GPT_MODEL = "gpt-4o-mini",
   DAILY_LIMIT = 5,
+  MAX_WORDS = 350,
 } = process.env;
 
 const TABLE_NAME = "letter_verifier";
@@ -49,9 +50,9 @@ const validateRequest = (userId, text, apiKey) => {
   }
 
   const wordCount = text.trim().split(/\s+/).length;
-  if (wordCount > maxWords) {
+  if (wordCount > MAX_WORDS) {
     throw new Error(
-      `Your letter exceeds the ${maxWords} word limit. Please shorten it and try again.`
+      `Your letter exceeds the ${MAX_WORDS} word limit. Please shorten it and try again.`
     );
   }
 };
