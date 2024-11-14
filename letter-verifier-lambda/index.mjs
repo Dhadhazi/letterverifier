@@ -47,6 +47,13 @@ const validateRequest = (userId, text, apiKey) => {
   if (!userId || !text) {
     throw new Error("Missing userId or text");
   }
+
+  const wordCount = text.trim().split(/\s+/).length;
+  if (wordCount > maxWords) {
+    throw new Error(
+      `Your letter exceeds the ${maxWords} word limit. Please shorten it and try again.`
+    );
+  }
 };
 
 const getCurrentDateKey = () => {
@@ -98,10 +105,6 @@ const updateUserRecord = async (userId, text, aiResponse) => {
   };
 
   try {
-    console.log(
-      "Updating DynamoDB with params:",
-      JSON.stringify(params, null, 2)
-    );
     const result = await dynamo.send(new UpdateCommand(params));
     return result.Attributes.messageCount;
   } catch (error) {
@@ -144,7 +147,23 @@ const getAIResponse = async (text) => {
   }
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+  "Access-Control-Allow-Methods": "OPTIONS,POST",
+  "Content-Type": "application/json",
+};
+
 export const handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: "",
+    };
+  }
+
   try {
     const body = JSON.parse(event.body);
     const { userId, text, apiKey } = body;
@@ -156,10 +175,7 @@ export const handler = async (event) => {
     if (currentCount >= parseInt(DAILY_LIMIT)) {
       return {
         statusCode: 400,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: corsHeaders,
         body: JSON.stringify({
           error: LIMIT_REACHED_MESSAGE,
           requests: 0,
@@ -173,23 +189,17 @@ export const handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: corsHeaders,
       body: JSON.stringify({
         response: aiResponse,
         requests: parseInt(DAILY_LIMIT) - newCount,
       }),
     };
   } catch (error) {
-    console.error("Handler Error:", error);
+    console.error("Error:", error);
     return {
       statusCode: error.message === "Invalid API key" ? 500 : 400,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ error: error.message }),
     };
   }

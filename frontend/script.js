@@ -111,23 +111,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     saveUserData();
-    setFormState(true);
+    setFormLoading(true);
 
     try {
       const result = await sendRequest();
       handleResponse(result);
     } catch (error) {
       console.error("Error:", error);
-      displayMessage("An error occurred. Please try again.");
+      displayMessage(error);
     } finally {
       elements.loadingIndicator.classList.add("hidden");
-      setFormState(false);
+      setFormLoading(false);
     }
   }
 
   function saveUserData() {
     localStorage.setItem("userId", elements.userId.value);
     localStorage.setItem("apiKey", elements.apiKey.value);
+  }
+
+  function setFormLoading(isLoading) {
+    elements.userId.disabled = isLoading;
+    elements.apiKey.disabled = isLoading;
+    elements.letterInput.disabled = isLoading;
+    elements.submitBtn.disabled = isLoading;
+    elements.submitBtn.style.backgroundColor = isLoading ? "#6c757d" : "";
+    elements.loadingIndicator.classList.toggle("hidden", !isLoading);
   }
 
   function setFormState(disabled) {
@@ -148,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Origin: window.location.origin,
         },
         body: JSON.stringify({
           userId: elements.userId.value,
@@ -156,12 +166,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Request failed");
+        throw new Error(data.error || "Request failed");
       }
 
-      return response.json();
+      return data;
     } catch (error) {
       console.error("Request error:", error);
       throw error;
@@ -191,6 +202,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function displayJsonResponse(response) {
+    const hasAllFields =
+      response.feedback?.professional_tone &&
+      response.feedback?.client_needs_and_proposed_solution &&
+      response.feedback?.understanding_of_business_impact &&
+      response.updated_letter;
+
+    if (!hasAllFields) {
+      displayMessage("Incomplete response received. Please try again.");
+      return;
+    }
     document.querySelector("#professionalTone p").textContent =
       response.feedback.professional_tone;
     document.querySelector("#clientNeedsSolution p").textContent =
@@ -215,5 +236,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const container = document.querySelector(".container");
     container.insertBefore(messageElement, container.firstChild);
+
+    setTimeout(() => {
+      const message = document.getElementById("messageDisplay");
+      if (message) {
+        message.remove();
+      }
+    }, 5000);
   }
 });
