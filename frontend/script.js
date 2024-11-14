@@ -1,4 +1,3 @@
-// const BACKEND_URL = "http://localhost:3000";
 const BACKEND_URL =
   "https://mh6papii0e.execute-api.eu-north-1.amazonaws.com/test";
 

@@ -1,6 +1,6 @@
-backend/node_modules
-backend/logs
-backend/.env
-backend/dist
-letter-verifier-lambda/node_modules
+backend-node/node_modules
+backend-node/logs
+backend-node/.env
+backend-node/dist
+backend-lambda/node_modules
 *.txt
