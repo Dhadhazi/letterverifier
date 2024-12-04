@@ -1,29 +1,36 @@
 const BACKEND_URL =
-  "https://mh6papii0e.execute-api.eu-north-1.amazonaws.com/test";
-
-document.addEventListener("DOMContentLoaded", () => {
-  const elements = {
-    form: document.getElementById("letterForm"),
-    userId: document.getElementById("userId"),
-    apiKey: document.getElementById("apiKey"),
-    letterInput: document.getElementById("letterInput"),
-    wordCount: document.getElementById("wordCount"),
-    wordWarning: document.getElementById("wordWarning"),
-    submitBtn: document.getElementById("submitBtn"),
-    loadingIndicator: document.getElementById("loadingIndicator"),
-    apiResponse: document.getElementById("apiResponse"),
-    remainingRequests: document.getElementById("remainingRequests"),
-  };
-
-  const DEBOUNCE_DELAY = 300;
-
-  const WORD_LIMITS = {
-    MIN: 100,
-    MAX: 300,
-    ABSOLUTE_MAX: 350,
-  };
-
-  initializeForm();
+  "https://ouq4sgv374.execute-api.us-east-1.amazonaws.com/Test_1";
+  
+  document.addEventListener("DOMContentLoaded", () => {
+    const elements = {
+      form: document.getElementById("letterForm"),
+      letterInput: document.getElementById("letterInput"),
+      wordCount: document.getElementById("wordCount"),
+      wordWarning: document.getElementById("wordWarning"),
+      submitBtn: document.getElementById("submitBtn"),
+      loadingIndicator: document.getElementById("loadingIndicator"),
+      apiResponse: document.getElementById("apiResponse"),
+      remainingRequests: document.getElementById("remainingRequests"),
+    };
+  
+    const DEBOUNCE_DELAY = 300;
+  
+    const WORD_LIMITS = {
+      MIN: 100,
+      MAX: 300,
+      ABSOLUTE_MAX: 350,
+    };
+  
+    function getUserIdFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get('userId');
+      if (!userId) {
+        displayMessage("No userId provided in URL");
+        elements.submitBtn.disabled = true;
+        return null;
+      }
+      return userId;
+    }
   setupEventListeners();
 
   function debounce(func, delay) {
@@ -32,11 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => func.apply(this, args), delay);
     };
-  }
-
-  function initializeForm() {
-    elements.userId.value = localStorage.getItem("userId") || "";
-    elements.apiKey.value = localStorage.getItem("apiKey") || "";
   }
 
   function setupEventListeners() {
@@ -109,7 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    saveUserData();
     setFormLoading(true);
 
     try {
@@ -124,14 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function saveUserData() {
-    localStorage.setItem("userId", elements.userId.value);
-    localStorage.setItem("apiKey", elements.apiKey.value);
-  }
-
   function setFormLoading(isLoading) {
-    elements.userId.disabled = isLoading;
-    elements.apiKey.disabled = isLoading;
     elements.letterInput.disabled = isLoading;
     elements.submitBtn.disabled = isLoading;
     elements.submitBtn.style.backgroundColor = isLoading ? "#6c757d" : "";
@@ -139,8 +133,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setFormState(disabled) {
-    elements.userId.disabled = disabled;
-    elements.apiKey.disabled = disabled;
     elements.letterInput.disabled = disabled;
     elements.submitBtn.disabled = disabled;
     elements.submitBtn.style.backgroundColor = disabled ? "#6c757d" : "";
@@ -151,6 +143,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendRequest() {
+    const userId = getUserIdFromUrl();
+    if (!userId) {
+      throw new Error("No userId provided");
+    }
+
     try {
       const response = await fetch(`${BACKEND_URL}/api/process-letter`, {
         method: "POST",
@@ -159,9 +156,8 @@ document.addEventListener("DOMContentLoaded", () => {
           Origin: window.location.origin,
         },
         body: JSON.stringify({
-          userId: elements.userId.value,
+          userId: userId,
           text: elements.letterInput.value,
-          apiKey: elements.apiKey.value,
         }),
       });
 

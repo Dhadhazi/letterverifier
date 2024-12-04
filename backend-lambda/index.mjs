@@ -7,12 +7,19 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 
 const {
-  API_KEY,
   OPENAI_API_KEY,
   GPT_MODEL = "gpt-4o-mini",
   DAILY_LIMIT = 5,
   MAX_WORDS = 350,
 } = process.env;
+
+const approvedUserIDs = [
+  "user123",
+  "freelancer456",
+  "writer789",
+  "editor101",
+  "client202"
+];
 
 const TABLE_NAME = "letter_verifier";
 const TIMEOUT_MESSAGE = "The server is busy. Please try again later.";
@@ -41,12 +48,13 @@ const client = new DynamoDBClient({});
 const dynamo = DynamoDBDocumentClient.from(client);
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-const validateRequest = (userId, text, apiKey) => {
-  if (apiKey !== API_KEY) {
-    throw new Error("Invalid API key");
-  }
+const validateRequest = (userId, text) => {
   if (!userId || !text) {
     throw new Error("Missing userId or text");
+  }
+
+  if (!approvedUserIDs.includes(userId)) {
+    throw new Error("Invalid user");
   }
 
   const wordCount = text.trim().split(/\s+/).length;
@@ -150,8 +158,7 @@ const getAIResponse = async (text) => {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+  "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization",
   "Access-Control-Allow-Methods": "OPTIONS,POST",
   "Content-Type": "application/json",
 };
@@ -167,9 +174,9 @@ export const handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body);
-    const { userId, text, apiKey } = body;
+    const { userId, text } = body;
 
-    validateRequest(userId, text, apiKey);
+    validateRequest(userId, text);
 
     const currentCount = await checkDailyLimit(userId);
 
@@ -199,7 +206,7 @@ export const handler = async (event) => {
   } catch (error) {
     console.error("Error:", error);
     return {
-      statusCode: error.message === "Invalid API key" ? 500 : 400,
+      statusCode: 400,
       headers: corsHeaders,
       body: JSON.stringify({ error: error.message }),
     };
